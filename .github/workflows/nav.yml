@@ -1,0 +1,27 @@
+# Copies the AMFI daily NAV file into this public repo, so the Dhanvith server can read it from GitHub.
+# AMFI's own site sometimes refuses requests from hosting providers; GitHub's servers usually work.
+name: Mirror AMFI NAV
+on:
+  schedule:
+    - cron: '30 17 * * *'   # 11:00 PM India time
+    - cron: '30 3 * * *'    # 9:00 AM India time
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the AMFI file
+        run: |
+          curl -fsSL --retry 3 -A "Mozilla/5.0" -o NAVAll.txt https://www.amfiindia.com/spages/NAVAll.txt \
+            || curl -fsSL --retry 3 -A "Mozilla/5.0" -o NAVAll.txt https://portal.amfiindia.com/spages/NAVAll.txt
+          test "$(wc -l < NAVAll.txt)" -gt 5000
+      - name: Publish it on the nav-data branch (one commit, replaced each time)
+        run: |
+          git init -q -b nav-data
+          git config user.name "nav-bot"
+          git config user.email "nav-bot@users.noreply.github.com"
+          git add NAVAll.txt
+          git commit -q -m "NAV $(date -u +%F)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" nav-data
